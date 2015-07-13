@@ -7,7 +7,7 @@ module Pgcrypto
       source_root File.expand_path('../templates', __FILE__)
 
       def copy_migration
-        migration_template("migration.rb", "db/migrate/install_pgcrypto")
+        migration_template("migration.rb", "db/migrate/install_pgcrypto.rb")
       end
 
       def create_initializer

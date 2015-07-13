@@ -21,8 +21,23 @@ module PGCrypto
   def self.keys
     @keys ||= KeyManager.new
   end
+
+  def self.mode
+    @mode ||= :asymmetric
+  end
+
+  def self.mode=(mode)
+    %i(symmetric asymmetric).include?(mode.to_sym) or raise ArgumentError.new( "Invalid value for PGCrypto mode: '#{mode}'" )
+    @mode = mode.to_sym
+  end
 end
 
 PGCrypto.keys[:public] = {:path => '.pgcrypto'} if File.file?('.pgcrypto')
 
 require 'pgcrypto/railtie' if defined? Rails::Railtie
+
+# Register the built-in postgres task class for use when running rake tasks.
+ActiveRecord::Tasks::DatabaseTasks.register_task( /pgcrypto/, ActiveRecord::Tasks::PostgreSQLDatabaseTasks )
+
+# Require our ActiveRecord extensions.
+require 'pgcrypto/extensions'
