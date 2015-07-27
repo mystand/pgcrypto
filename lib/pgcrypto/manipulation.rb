@@ -28,13 +28,13 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
               expr = null_literal
             when Arel::Nodes::BindParam
               if chosen_bind = binds.detect{ |b| b.first.name == column.name }
-                expr = chosen_bind.last.nil? ? null_literal : PGCrypto::Crypt.encrypt_string( chosen_bind.last, key, self )
+                expr = chosen_bind.last.nil? ? null_literal : PGCrypto::Crypt.encrypt_string( chosen_bind.last, key )
                 binds.delete( chosen_bind )
               else
                 raise "Could not find binding for column #{column.name}!"
               end
             when String
-              expr = PGCrypto::Crypt.encrypt_string( expr, key, self )
+              expr = PGCrypto::Crypt.encrypt_string( expr, key )
             else
               raise "Unknown node class presented to pgcrypto_insert: #{expr.class.to_s}!"
             end
@@ -73,13 +73,13 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
               value.right = null_literal
             when Arel::Nodes::BindParam
               if chosen_bind = binds.detect{ |b| b.first.name == column_name }
-                value.right = chosen_bind.last.nil? ? null_literal : PGCrypto::Crypt.encrypt_string( chosen_bind.last, key, self )
+                value.right = chosen_bind.last.nil? ? null_literal : PGCrypto::Crypt.encrypt_string( chosen_bind.last, key )
                 binds.delete( chosen_bind )
               else
                 raise "Could not find binding for column #{column_name}!"
               end
             when String
-              value.right = PGCrypto::Crypt.encrypt_string( value.right, key, self )
+              value.right = PGCrypto::Crypt.encrypt_string( value.right, key )
             else
               raise "Unknown node class presented to pgcrypto_update: #{value.class.to_s}!"
             end

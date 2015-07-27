@@ -15,7 +15,7 @@ module PGCrypto
       end
 
       def encrypt_string( string, key, quoter = nil )
-        quoter ||= PGCrypto::Adapter.new # It's cleaner to pass in an existing instance of an adapter if you can.
+        quoter ||= ActiveRecord::Base.connection
         encryption_instruction = case PGCrypto.mode
         when :asymmetric
           %[pgp_pub_encrypt(#{quoter.quote( string )}, #{key.dearmored})]
