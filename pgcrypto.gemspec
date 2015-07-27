@@ -4,12 +4,12 @@
 Gem::Specification.new do |s|
 
   s.name          = "pgcrypto"
-  s.version       = "0.5.0.pre1"
+  s.version       = "0.5.0.pre2"
   s.summary       = "A database adapter and ActiveRecord::Base extensions to support encrypted columns."
   s.homepage      = "http://github.com/BlinkerGit/pgcrypto"
   s.authors       = ["Flip Sasser","Andy Rusterholz"]
   s.email         = "andy@blinker.com"
-  s.date          = "2015-07-10"
+  s.date          = "2015-07-27"
 
   s.description   = %{
     PGCrypto is a thin database adapter that makes it convenient and transparent to encrypt columns
@@ -20,9 +20,11 @@ Gem::Specification.new do |s|
   }
 
   s.post_install_message = %{
+
     NOTE: This version of the pgcrypto gem is experimental. Please monitor your
     application closely for any abnormal results from database operations. Report
     any errors, misbehaviors, or unexpected effects to andy@blinker.com.
+
   }
 
   # Our code is built to work with Rails 4.2. Rails 5.0 will bring breaking changes.
@@ -64,6 +66,7 @@ Gem::Specification.new do |s|
     lib/pgcrypto/has_encrypted_column.rb
     lib/pgcrypto/key.rb
     lib/pgcrypto/key_manager.rb
+    lib/pgcrypto/manipulation.rb
     lib/pgcrypto/railtie.rb
     lib/pgcrypto/table.rb
     lib/pgcrypto/table_manager.rb
