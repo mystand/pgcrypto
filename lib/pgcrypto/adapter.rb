@@ -32,7 +32,7 @@ module PGCrypto
 
     # Uncomment this next method if you want some helpful debug output during development:
     # def exec_query(*args)
-    #   unless args[1].try(:strip).try(:downcase) == 'schema'
+    #   unless args[1].try(:strip).try(:downcase) == 'schema' || !$pgcrypto_debug
     #     puts
     #     puts " ------------------ #{args[1]}: #{args[0].inspect}"
     #     puts

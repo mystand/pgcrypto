@@ -6,18 +6,23 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
     def process_arel( arel, binds = [] )
       case arel
       when Arel::InsertManager
-        pgcrypto_insert(arel, binds)
+        process_insert(arel, binds)
       when Arel::SelectManager
-        pgcrypto_select(arel, binds)
+        process_select(arel, binds)
       when Arel::UpdateManager
-        pgcrypto_update(arel, binds)
+        process_update(arel, binds)
       end
       return arel, binds
     end
 
+    def process_raw_relation( relation ) # For use where AR builds a relation without a surrounding statement.
+      r = translate_where( relation )
+      Array === r ? r.inject{ |x,y| x.and y } : r
+    end
+
     private
 
-    def pgcrypto_insert(arel, binds = [])
+    def process_insert(arel, binds = [])
       if table = PGCrypto[arel.ast.relation.name.to_s]
         arel.ast.columns.each_with_index do |column, i|
           if options = table[column.name.to_sym]
@@ -45,23 +50,25 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
       end
     end
 
-    def pgcrypto_select(arel, binds = [])
+    def process_select(arel, binds = [])
       # We start by looping through each "core," which is just a
       # SelectStatement and correcting plain-text queries against an encrypted
       # column...
       arel.ast.cores.each do |core|
         next unless core.is_a?(Arel::Nodes::SelectCore)
 
-        pgcrypto_translate_selects(core, core.projections) if core.projections
-        pgcrypto_translate_selects(core, core.having) if core.having
+        translate_selects(core, core.projections) if core.projections
+        translate_selects(core, core.having) if core.having
 
         # Loop through each WHERE to determine whether or not we need to refer
         # to its decrypted counterpart
-        pgcrypto_translate_wheres_for_select(core)
+        core.wheres.each do |where|
+          translate_where( where )
+        end
       end
     end
 
-    def pgcrypto_update(arel, binds = [])
+    def process_update(arel, binds = [])
       table_name = arel.ast.relation.name.to_s
       if columns = PGCrypto[table_name]
         # Find all columns with encryption instructions and encrypt them
@@ -88,12 +95,12 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
         end
         # Find any where clauses that refer to encrypted columns and correct them
         arel.ast.wheres.each do |where|
-          pgcrypto_translate_where( where, table_name, columns )
+          translate_where( where )
         end
       end
     end
 
-    def pgcrypto_translate_selects(core, selects)
+    def translate_selects(core, selects)
       table_name = core.source.left.name
       columns = PGCrypto[table_name]
       return if columns.empty?
@@ -112,7 +119,7 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
         end
       end
 
-      splat_projection = selects.find { |select| select.respond_to?(:name) && select.name == '*' }
+      splat_projection = selects.find{ |s| s.respond_to?(:name) && s.name == '*' }
       if untouched_columns.any? && splat_projection
         untouched_columns.each do |column|
           next unless (key = PGCrypto.keys.private_key(columns[column.to_sym]))
@@ -122,47 +129,51 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
       end
     end
 
-    def pgcrypto_translate_wheres_for_select(core)
-      table_name = core.source.left.name
-      columns = PGCrypto[table_name]
-      return if columns.empty?
-
-      core.wheres.each do |where|
-        pgcrypto_translate_where( where, table_name, columns )
+    def translate_where( where )
+      if where.respond_to?(:children)
+        where.children.each do |child|
+          translate_where( child ) # Recursively iterate through the children to find comparison nodes.
+        end
+      elsif where.respond_to?(:right) && where.respond_to?(:left)
+        translate_child( where )
       end
     end
 
-    def pgcrypto_translate_where( where, table_name, columns )
-      if where.respond_to?(:children)
-        # Loop through the children to replace them with a decrypted counterpart
-        where.children.each do |child|
+    def translate_child( child )
+      return child unless child.respond_to?(:left)
+      table_name = child.left.relation.name
+      columns    = PGCrypto[ table_name ]
+      return child unless columns.present?
+      return child unless options = columns[ child.left.name.to_s ]
+      key        = PGCrypto.keys.private_key( options )
+      child.left = PGCrypto::Crypt.decrypt_column(table_name, child.left.name, key)
 
-          next unless child.respond_to?(:left) && options = columns[child.left.name.to_s]
-          key = PGCrypto.keys.private_key( options )
-          child.left = PGCrypto::Crypt.decrypt_column(table_name, child.left.name, key)
-
-          # Prevent ActiveRecord from re-casting the value to binary
-          case child.right
-          when String
-            child.right = quoted_literal( child.right )
-          when Arel::Nodes::Casted
-            child.right = quoted_literal( child.right.val )
-          when Array
-            child.right = child.right.map do |item|
-              case item
-              when Arel::Nodes::Casted
-                quoted_literal( item.val )
-              else
-                raise "Unknown node class presented to block in pgcrypto_translate_wheres: #{item.class.to_s}!"
-              end
-            end
-          when Arel::Nodes::BindParam
-            # Do nothing -- ActiveRecord will pass the correct binding and cast it appropriately.
-          else
-            raise "Unknown node class presented to pgcrypto_translate_wheres: #{child.right.class.to_s}!"
+      # Prevent ActiveRecord from re-casting the value to binary
+      case child.right
+      when String
+        child.right = quoted_literal( child.right )
+      when Arel::Nodes::Casted
+        if Hash === child.right.val
+          if child.right.val.key?( :value )
+            child.right = quoted_literal( child.right.val[ :value ] )
+          else raise "Unknown value format presented to block in translate_child: #{child.right.val.inspect}!"
           end
-
+        else
+          child.right = quoted_literal( child.right.val )
         end
+      when Array
+        child.right = child.right.map do |item|
+          case item
+          when Arel::Nodes::Casted
+            quoted_literal( item.val )
+          else
+            raise "Unknown node class presented to block in translate_child: #{item.class.to_s}!"
+          end
+        end
+      when Arel::Nodes::BindParam
+        # Do nothing -- ActiveRecord will pass the correct binding and cast it appropriately.
+      else
+        raise "Unknown node class presented to translate_child: #{child.right.class.to_s}!"
       end
     end
 
@@ -170,8 +181,10 @@ module PGCrypto::Manipulation # Encapsulate the logic that manipulates AREL tree
       Arel::Nodes::SqlLiteral.new('NULL')
     end
 
-    def quoted_literal( str )
-      Arel::Nodes::SqlLiteral.new("'#{quote_string( str )}'")
+    def quoted_literal( str, quoter = nil )
+      return null_literal if str.nil?
+      quoter ||= ActiveRecord::Base.connection
+      Arel::Nodes::SqlLiteral.new("'#{quoter.quote_string( str )}'")
     end
 
   end
