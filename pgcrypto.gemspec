@@ -4,7 +4,7 @@
 Gem::Specification.new do |s|
 
   s.name          = "pgcrypto"
-  s.version       = "0.5.0.pre3"
+  s.version       = "0.5.0.pre4"
   s.summary       = "A database adapter and ActiveRecord::Base extensions to support encrypted columns."
   s.homepage      = "http://github.com/BlinkerGit/pgcrypto"
   s.authors       = ["Flip Sasser","Andy Rusterholz"]
