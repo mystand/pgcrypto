@@ -175,3 +175,7 @@ it; the rest is up to you.
 **As such,** the author and Delightful Widgets Inc. offer ***ABSOLUTELY NO GODDAMN WARRANTY***. Sorry, folks.
 
 Copyright (C) 2012 Delightful Widgets, Inc. Built by Flip Sasser, Monkeypatcher Extraordinaire!
+
+Mystand Inc. additions
+We need to implement support aes256 algorithm.
+
