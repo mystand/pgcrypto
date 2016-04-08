@@ -20,7 +20,7 @@ module PGCrypto
         when :asymmetric
           %[pgp_pub_encrypt(#{quoter.quote( string )}, #{key.dearmored})]
         when :symmetric
-          %[pgp_sym_encrypt(#{quoter.quote( string )}, '#{key.to_s}')]
+          %[pgp_sym_encrypt(#{quoter.quote( string )}, '#{key.to_s}', 'cipher-algo=aes256')]
         end
         Arel::Nodes::SqlLiteral.new(encryption_instruction)
       end
